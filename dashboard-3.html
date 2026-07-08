@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>⏱️</text></svg>">
+<title>TEMPUS | Dashboard Recrutement</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+:root { --bg: #f7f7f8; --card: #ffffff; --text: #111111; --border: #e5e5e5; --accent: #111111; --radius: 10px; }
+body { font-family: -apple-system, BlinkMacSystemFont, Arial, sans-serif; background: var(--bg); color: var(--text); padding: 24px; }
+.container { max-width: 1200px; margin: 0 auto; }
+.auth-box { max-width: 400px; margin: 100px auto; background: var(--card); padding: 32px; border-radius: var(--radius); box-shadow: 0 4px 12px rgba(0,0,0,0.05); text-align: center; }
+.auth-box input { width: 100%; padding: 12px; margin: 8px 0; border: 1px solid var(--border); border-radius: 6px; }
+.auth-box button { width: 100%; padding: 12px; background: var(--accent); color: #fff; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; margin-top: 8px; }
+.auth-box button:disabled { opacity: 0.5; cursor: not-allowed; }
+.auth-loader { display: none; border: 3px solid var(--border); border-top: 3px solid var(--accent); border-radius: 50%; width: 24px; height: 24px; animation: spin 1s linear infinite; margin: 16px auto 0; }
+@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+#dashboard { display: none; }
+.header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; flex-wrap: wrap; gap: 12px; }
+.header-actions { display: flex; gap: 8px; align-items: center; }
+.header-actions button { padding: 8px 16px; cursor: pointer; border: 1px solid var(--border); background: var(--card); border-radius: 6px; }
+.stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 24px; }
+.stat-card { background: var(--card); padding: 20px; border-radius: var(--radius); border: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+.controls { display: flex; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; }
+.controls input, .controls select { padding: 10px; border: 1px solid var(--border); border-radius: 6px; }
+
+table { width: 100%; background: var(--card); border-collapse: collapse; border-radius: var(--radius); overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.02); }
+th, td { padding: 16px; text-align: left; border-bottom: 1px solid var(--border); }
+th { background: #fdfdfd; font-size: 13px; text-transform: uppercase; color: #888; }
+th.sortable { cursor: pointer; user-select: none; }
+th.sortable:hover { color: var(--text); }
+.arrow { font-size: 10px; opacity: 0.6; }
+.badge { padding: 4px 8px; border-radius: 20px; font-size: 12px; font-weight: 600; }
+.empty-state { text-align: center; padding: 40px; color: #888; }
+
+.modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); align-items: center; justify-content: center; padding: 24px; }
+.modal-content { background: var(--card); padding: 32px; border-radius: var(--radius); width: 100%; max-width: 600px; max-height: 85vh; overflow-y: auto; }
+textarea { width: 100%; height: 100px; padding: 12px; border: 1px solid var(--border); border-radius: 6px; margin-top: 8px; resize: vertical; }
+</style>
+</head>
+<body>
+
+<div class="auth-box" id="auth">
+<h2>Accès Manager</h2>
+<p style="color:#888; font-size:13px; margin-top:8px;">Connecte-toi avec ton compte TEMPUS.</p>
+<input type="email" id="email" placeholder="Email" autocomplete="username">
+<input type="password" id="pwd" placeholder="Mot de passe" autocomplete="current-password" onkeypress="if(event.key==='Enter') login()">
+<button id="loginBtn" onclick="login()">Se connecter</button>
+<div class="auth-loader" id="authLoader"></div>
+<p id="authErr" style="color:red; display:none; margin-top:10px; font-size:13px;">Email ou mot de passe incorrect</p>
+</div>
+
+<div class="container" id="dashboard">
+<div class="header">
+<h1>Candidatures TEMPUS</h1>
+<div class="header-actions">
+<button onclick="exportCSV()">📥 Exporter CSV</button>
+<button onclick="loadData()">🔄 Actualiser</button>
+<button onclick="logout()">🚪 Déconnexion</button>
+</div>
+</div>
+
+<div class="stats-grid">
+<div class="stat-card"><div>Total</div><h2 id="s-total">0</h2></div>
+<div class="stat-card"><div>Idéal (≥80)</div><h2 id="s-ideal" style="color:#16a34a">0</h2></div>
+<div class="stat-card"><div>Prometteur (60-79)</div><h2 id="s-prom" style="color:#2563eb">0</h2></div>
+<div class="stat-card"><div>À développer (&lt;60)</div><h2 id="s-dev" style="color:#ca8a04">0</h2></div>
+<div class="stat-card" style="grid-column: span 2;">
+<canvas id="chart" height="80"></canvas>
+</div>
+</div>
+
+<div class="controls">
+<input type="text" id="search" placeholder="Rechercher nom/email..." oninput="renderTable()">
+<select id="filterNiveau" onchange="renderTable()">
+<option value="all">Tous les niveaux</option>
+<option value="ideal">Idéal (≥80)</option>
+<option value="prom">Prometteur (60-79)</option>
+<option value="dev">À développer (&lt;60)</option>
+</select>
+<select id="filterStatus" onchange="renderTable()">
+<option value="all">Tous les statuts</option>
+<option value="À contacter">À contacter</option>
+<option value="Contacté">Contacté</option>
+<option value="Entretien">Entretien</option>
+<option value="Embauché">Embauché</option>
+<option value="Refusé">Refusé</option>
+</select>
+</div>
+
+<table>
+<thead>
+<tr><th class="sortable" onclick="setSort('date')">Date <span class="arrow" id="arrow-date"></span></th><th>Candidat</th><th>Contact</th><th class="sortable" onclick="setSort('scorePct')">Score <span class="arrow" id="arrow-scorePct"></span></th><th>Statut</th><th>Action</th></tr>
+</thead>
+<tbody id="tbody"></tbody>
+</table>
+</div>
+
+<div class="modal" id="modal">
+<div class="modal-content">
+<div style="display:flex; justify-content:space-between; margin-bottom:24px;">
+<h2 id="m-nom">Candidat</h2>
+<button onclick="document.getElementById('modal').style.display='none'">Fermer</button>
+</div>
+<p><strong>Score :</strong> <span id="m-score"></span>/100</p>
+
+<div style="margin-top:20px;">
+<label>Statut de suivi :</label>
+<select id="m-status" style="width:100%; padding:10px; margin-top:8px;">
+<option value="À contacter">À contacter</option>
+<option value="Contacté">Contacté</option>
+<option value="Entretien">Entretien</option>
+<option value="Embauché">Embauché</option>
+<option value="Refusé">Refusé</option>
+</select>
+</div>
+
+<div style="margin-top:20px;">
+<label>Notes privées :</label>
+<textarea id="m-notes" placeholder="Impressions après l'appel..."></textarea>
+</div>
+
+<button onclick="saveCandidate()" style="margin-top:20px; width:100%; padding:12px; background:black; color:white; border-radius:6px; cursor:pointer;">Enregistrer les modifications</button>
+</div>
+</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+import {
+getFirestore, collection, getDocs, doc, updateDoc, orderBy, query
+} from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+import {
+getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut
+} from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+
+// 🔴 CONFIG FIREBASE
+const firebaseConfig = {
+  apiKey: "AIzaSyCHd-33lduxacmQqf_KVBM75DiTHypTZtE",
+  authDomain: "cellule-tempus---recrutement.firebaseapp.com",
+  projectId: "cellule-tempus---recrutement",
+  storageBucket: "cellule-tempus---recrutement.firebasestorage.app",
+  messagingSenderId: "633433795667",
+  appId: "1:633433795667:web:3b9d7f947e4f6e487baaa6"
+};
+
+let db, auth;
+try {
+const app = initializeApp(firebaseConfig);
+db = getFirestore(app);
+auth = getAuth(app);
+} catch (e) { console.warn("Firebase non configuré.", e); }
+
+let candidates = [];
+let currentEditId = null;
+let chartInstance = null;
+let sortField = 'date';
+let sortDir = 'desc';
+
+// Couleurs de badge par statut (avant : gris fixe pour tous les statuts)
+const STATUS_COLORS = {
+  'À contacter': { bg: '#f0f0f0', fg: '#555' },
+  'Contacté':    { bg: '#dbeafe', fg: '#1d4ed8' },
+  'Entretien':   { bg: '#fef9c3', fg: '#a16207' },
+  'Embauché':    { bg: '#dcfce7', fg: '#15803d' },
+  'Refusé':      { bg: '#fee2e2', fg: '#b91c1c' }
+};
+
+// Reste connecté tant que la session Firebase Auth est valide
+onAuthStateChanged(auth, (user) => {
+if (user) {
+document.getElementById('auth').style.display = 'none';
+document.getElementById('dashboard').style.display = 'block';
+loadData();
+} else {
+document.getElementById('auth').style.display = 'block';
+document.getElementById('dashboard').style.display = 'none';
+}
+});
+
+window.login = async () => {
+const email = document.getElementById('email').value.trim();
+const pwd = document.getElementById('pwd').value;
+const btn = document.getElementById('loginBtn');
+const loader = document.getElementById('authLoader');
+const err = document.getElementById('authErr');
+
+err.style.display = 'none';
+btn.disabled = true;
+loader.style.display = 'block';
+
+try {
+await signInWithEmailAndPassword(auth, email, pwd);
+// onAuthStateChanged prend le relais pour afficher le dashboard
+} catch (e) {
+console.error(e);
+err.style.display = 'block';
+} finally {
+btn.disabled = false;
+loader.style.display = 'none';
+}
+};
+
+window.logout = async () => {
+await signOut(auth);
+};
+
+window.loadData = async () => {
+if (!db) return alert("Firebase non configuré.");
+document.getElementById('tbody').innerHTML = `<tr><td colspan="6" class="empty-state">Chargement...</td></tr>`;
+try {
+  const q = query(collection(db, "candidates"), orderBy("date", "desc"));
+  const snap = await getDocs(q);
+  candidates = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  renderTable();
+  updateStats();
+} catch (e) {
+  console.error(e);
+  document.getElementById('tbody').innerHTML = `<tr><td colspan="6" class="empty-state">Erreur de chargement. Réessaie.</td></tr>`;
+}
+};
+
+window.setSort = (field) => {
+if (sortField === field) { sortDir = sortDir === 'asc' ? 'desc' : 'asc'; }
+else { sortField = field; sortDir = 'desc'; }
+document.getElementById('arrow-date').textContent = sortField === 'date' ? (sortDir === 'asc' ? '▲' : '▼') : '';
+document.getElementById('arrow-scorePct').textContent = sortField === 'scorePct' ? (sortDir === 'asc' ? '▲' : '▼') : '';
+renderTable();
+};
+
+window.renderTable = () => {
+const search = document.getElementById('search').value.toLowerCase();
+const status = document.getElementById('filterStatus').value;
+const niveau = document.getElementById('filterNiveau').value;
+
+let filtered = candidates.filter(c => {
+const matchText = (c.prenom + ' ' + c.nom + ' ' + c.email).toLowerCase().includes(search);
+const matchStatus = status === 'all' || c.status === status;
+const matchNiveau = niveau === 'all'
+  || (niveau === 'ideal' && c.scorePct >= 80)
+  || (niveau === 'prom' && c.scorePct >= 60 && c.scorePct < 80)
+  || (niveau === 'dev' && c.scorePct < 60);
+return matchText && matchStatus && matchNiveau;
+});
+
+filtered.sort((a, b) => {
+let va, vb;
+if (sortField === 'date') {
+  va = a.date?.toMillis ? a.date.toMillis() : 0;
+  vb = b.date?.toMillis ? b.date.toMillis() : 0;
+} else {
+  va = a.scorePct || 0; vb = b.scorePct || 0;
+}
+return sortDir === 'asc' ? va - vb : vb - va;
+});
+
+if (filtered.length === 0) {
+document.getElementById('tbody').innerHTML = `<tr><td colspan="6" class="empty-state">Aucun candidat trouvé.</td></tr>`;
+return;
+}
+
+document.getElementById('tbody').innerHTML = filtered.map(c => {
+const d = c.date?.toDate ? c.date.toDate().toLocaleDateString('fr-BE') : 'N/A';
+const st = c.status || 'À contacter';
+const col = STATUS_COLORS[st] || STATUS_COLORS['À contacter'];
+return `<tr>
+  <td>${d}</td>
+  <td><strong>${c.prenom} ${c.nom}</strong></td>
+  <td>${c.email}<br><small>${c.tel}</small></td>
+  <td><strong>${c.scorePct}</strong></td>
+  <td><span class="badge" style="background:${col.bg}; color:${col.fg}">${st}</span></td>
+  <td><button onclick="openModal('${c.id}')" style="cursor:pointer">Gérer</button></td>
+</tr>`;
+}).join('');
+};
+
+function updateStats() {
+document.getElementById('s-total').textContent = candidates.length;
+const ideals = candidates.filter(c => c.scorePct >= 80).length;
+const prom = candidates.filter(c => c.scorePct >= 60 && c.scorePct < 80).length;
+const dev = candidates.filter(c => c.scorePct < 60).length;
+document.getElementById('s-ideal').textContent = ideals;
+document.getElementById('s-prom').textContent = prom;
+document.getElementById('s-dev').textContent = dev;
+
+const ctx = document.getElementById('chart').getContext('2d');
+if (chartInstance) chartInstance.destroy();
+chartInstance = new Chart(ctx, {
+type: 'doughnut',
+data: {
+labels: ['Idéal (≥80)', 'Prometteur (60-79)', 'À développer (<60)'],
+datasets: [{
+data: [ideals, prom, dev],
+backgroundColor: ['#16a34a', '#2563eb', '#ca8a04']
+}]
+},
+options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right' } } }
+});
+}
+
+window.exportCSV = () => {
+if (candidates.length === 0) return alert('Aucun candidat à exporter');
+const headers = ['Date', 'Prenom', 'Nom', 'Email', 'Telephone', 'Score', 'Statut', 'Notes'];
+const rows = candidates.map(c => [
+  c.date?.toDate ? c.date.toDate().toISOString() : '',
+  c.prenom || '', c.nom || '', c.email || '', c.tel || '', c.scorePct ?? '', c.status || 'À contacter', (c.notes || '').replace(/"/g, '""')
+].map(v => `"${v}"`).join(','));
+const csv = [headers.join(','), ...rows].join('\n');
+const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+const url = URL.createObjectURL(blob);
+const a = document.createElement('a');
+a.href = url; a.download = `candidats_${new Date().toISOString().slice(0,10)}.csv`; a.click();
+URL.revokeObjectURL(url);
+};
+
+window.openModal = (id) => {
+const c = candidates.find(x => x.id === id);
+currentEditId = id;
+document.getElementById('m-nom').textContent = `${c.prenom} ${c.nom}`;
+document.getElementById('m-score').textContent = c.scorePct;
+document.getElementById('m-status').value = c.status || 'À contacter';
+document.getElementById('m-notes').value = c.notes || '';
+document.getElementById('modal').style.display = 'flex';
+};
+
+window.saveCandidate = async () => {
+const nStatus = document.getElementById('m-status').value;
+const nNotes = document.getElementById('m-notes').value;
+const btn = event.target;
+btn.disabled = true;
+
+try {
+  const ref = doc(db, "candidates", currentEditId);
+  await updateDoc(ref, { status: nStatus, notes: nNotes });
+
+  const idx = candidates.findIndex(x => x.id === currentEditId);
+  candidates[idx].status = nStatus; candidates[idx].notes = nNotes;
+
+  document.getElementById('modal').style.display = 'none';
+  renderTable();
+  updateStats();
+} catch (e) {
+  console.error(e);
+  alert("Erreur lors de l'enregistrement. Réessaie.");
+} finally {
+  btn.disabled = false;
+}
+};
+</script>
+</body>
+</html>

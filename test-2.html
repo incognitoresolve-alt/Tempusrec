@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Test de compatibilité | TEMPUS</title>
+  <meta name="description" content="10 questions pour évaluer ton potentiel entrepreneurial.">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>⏱️</text></svg>">
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+  <style>
+    :root {
+      --bg: #ffffff; --bg-soft: #f7f7f8; --text: #111111; --text-sec: #555555;
+      --text-muted: #888888; --border: #e5e5e5; --accent: #111111; --accent-light: #f0f0f0;
+      --success: #16a34a; --success-bg: #dcfce7; --warning: #ca8a04; --warning-bg: #fef9c3;
+      --danger: #dc2626; --danger-bg: #fee2e2; --info: #2563eb; --info-bg: #dbeafe;
+      --radius: 10px; --radius-sm: 6px;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root { --bg: #0a0a0a; --bg-soft: #141414; --text: #f0f0f0; --text-sec: #a0a0a0; --border: #2a2a2a; --accent: #f0f0f0; --accent-light: #1a1a1a; }
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; }
+    .container { max-width: 640px; margin: 0 auto; padding: 48px 24px; }
+    .header { text-align: center; margin-bottom: 40px; }
+    .lang-switch { position: absolute; top: 16px; right: 24px; font-size: 14px; }
+    .lang-switch select { padding: 4px; border-radius: 4px; background: var(--bg-soft); color: var(--text); border: 1px solid var(--border); }
+    .progress-bar { width: 100%; height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; margin-bottom: 32px; }
+    .progress-fill { height: 100%; background: var(--accent); transition: width 0.4s ease; width: 0%; }
+    .question { display: none; opacity: 0; transition: opacity 0.3s ease; margin-bottom: 28px; }
+    .question.active { display: block; opacity: 1; }
+    .q-text { font-size: 18px; font-weight: 600; margin-bottom: 16px; display: block; }
+    .option { display: flex; align-items: center; gap: 12px; padding: 16px; border-radius: var(--radius-sm); border: 1.5px solid var(--border); cursor: pointer; transition: all 0.2s ease; margin-bottom: 10px; min-height: 44px; }
+    .option:hover, .option:focus-within { border-color: var(--text-muted); background: var(--bg-soft); }
+    .option.selected { border-color: var(--accent); background: var(--accent-light); }
+    .option input { accent-color: var(--accent); width: 18px; height: 18px; }
+    .nav-btns { display: flex; justify-content: space-between; margin-top: 24px; }
+    .btn { padding: 12px 24px; border-radius: var(--radius); font-size: 15px; font-weight: 600; cursor: pointer; border: 1px solid var(--border); background: var(--bg); color: var(--text); min-height: 44px; transition: 0.2s; }
+    .btn-primary { background: var(--accent); color: var(--bg); border-color: var(--accent); }
+    .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    .result { display: none; text-align: center; animation: fadeIn 0.5s; }
+    .contact-form { text-align: left; background: var(--bg-soft); padding: 24px; border-radius: var(--radius); margin-top: 32px; }
+    .form-group { margin-bottom: 16px; }
+    .form-group input, .form-group textarea { width: 100%; padding: 12px; border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--bg); color: var(--text); font-family: inherit; }
+    .honeypot { display: none; }
+    .loader { display: none; border: 3px solid var(--border); border-top: 3px solid var(--accent); border-radius: 50%; width: 24px; height: 24px; animation: spin 1s linear infinite; margin: 0 auto; }
+    .form-error { display: none; color: var(--danger); background: var(--danger-bg); padding: 12px; border-radius: var(--radius-sm); margin-bottom: 16px; font-size: 14px; }
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+  <div class="lang-switch">
+    <select id="langSelect" onchange="changeLang(this.value)" aria-label="Choisir la langue">
+      <option value="fr">FR</option>
+      <option value="nl">NL</option>
+    </select>
+  </div>
+  <div class="container">
+    <div class="header">
+      <h1 id="t-title">Es-tu fait pour l'entrepreneuriat ?</h1>
+      <p id="t-subtitle">10 questions. Un score honnête sur ta compatibilité.</p>
+    </div>
+
+    <!-- Étape 1 : coordonnées, avant de démarrer le quiz -->
+    <div id="infoStep">
+      <h3 style="margin-bottom:16px;">Commençons par tes coordonnées</h3>
+      <div class="form-error" id="infoError">Merci de remplir tous les champs obligatoires (*).</div>
+      <input type="text" name="website" class="honeypot" tabindex="-1" autocomplete="off" id="honeypot">
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+        <div class="form-group"><input type="text" id="f-prenom" required placeholder="Prénom *" aria-label="Prénom"></div>
+        <div class="form-group"><input type="text" id="f-nom" required placeholder="Nom *" aria-label="Nom"></div>
+      </div>
+      <div class="form-group"><input type="email" id="f-email" required placeholder="Email *" aria-label="Email"></div>
+      <div class="form-group"><input type="tel" id="f-tel" required placeholder="Téléphone *" aria-label="Téléphone"></div>
+      <div class="form-group"><input type="text" id="f-ville" required placeholder="Ville *" aria-label="Ville"></div>
+      <div class="form-group"><textarea id="f-message" rows="3" placeholder="Un mot sur ta motivation (optionnel)" aria-label="Message" style="resize:vertical;"></textarea></div>
+      <button type="button" class="btn btn-primary" style="width:100%" onclick="startQuiz()">Commencer le test</button>
+    </div>
+
+    <!-- Étape 2 : quiz -->
+    <div id="quizStep" style="display:none">
+      <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+      <div id="quizContainer"></div>
+      <div class="nav-btns" id="navButtons">
+        <button type="button" class="btn" id="prevBtn" onclick="changeQ(-1)" disabled>Précédent</button>
+        <button type="button" class="btn btn-primary" id="nextBtn" onclick="changeQ(1)" disabled>Suivant</button>
+      </div>
+      <div class="form-error" id="formError">Une erreur est survenue lors de l'envoi. Réessaie.</div>
+    </div>
+
+    <!-- Étape 3 : résultat (affiché après soumission) -->
+    <div class="result" id="resultBlock">
+      <div style="font-size:72px; font-weight:700" id="resultScore">0</div>
+      <div id="resultLabel" style="padding:8px 16px; border-radius:6px; display:inline-block; font-weight:600; margin-bottom:16px;"></div>
+      <p id="resultDesc" style="color:var(--text-sec); margin-bottom:24px;"></p>
+      <div style="text-align:center; padding:20px;">
+        <div style="font-size:40px; margin-bottom:10px">✅</div>
+        <h3>Candidature envoyée !</h3>
+        <p style="color:var(--text-sec)">Nous te recontactons sous 48h.</p>
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    // ========================================================================
+    // 1. CONFIGURATION FIREBASE — synchronisée avec le projet du dashboard
+    // (cellule-tempus---recrutement) pour que les candidatures atterrissent
+    // dans la même collection Firestore que lit dashboard.html
+    // ========================================================================
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+    import { getFirestore, collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyCHd-33lduxacmQqf_KVBM75DiTHypTZtE",
+      authDomain: "cellule-tempus---recrutement.firebaseapp.com",
+      projectId: "cellule-tempus---recrutement",
+      storageBucket: "cellule-tempus---recrutement.firebasestorage.app",
+      messagingSenderId: "633433795667",
+      appId: "1:633433795667:web:3b9d7f947e4f6e487baaa6"
+    };
+
+    let db;
+    try {
+      const app = initializeApp(firebaseConfig);
+      db = getFirestore(app);
+    } catch(e) {
+      console.warn("Firebase non configuré.", e);
+    }
+
+    // Événement "démarrage" anonyme, utilisé par le dashboard pour calculer
+    // le taux de complétion (candidatures envoyées / tests démarrés).
+    // N'échoue jamais silencieusement de façon bloquante : une erreur ici
+    // ne doit pas empêcher l'utilisateur de passer le test.
+    if (db) {
+      addDoc(collection(db, "quiz_events"), { type: "start", date: serverTimestamp() }).catch(() => {});
+    }
+
+    // ========================================================================
+    // 2. DONNÉES DU QUIZ & TRADUCTIONS (10 Questions Complétées)
+    // ========================================================================
+    const i18n = {
+      fr: {
+        title: "Es-tu fait pour l'entrepreneuriat ?", sub: "10 questions. Un score honnête sur ta compatibilité.",
+        prev: "Précédent", next: "Suivant", results: "Voir mon résultat",
+        q1: "Quelle est ta situation professionnelle actuelle ?", q1_a: "Salarié(e) en quête d'autonomie", q1_b: "Auto-entrepreneur débutant", q1_c: "En reconversion", q1_d: "Besoin urgent de revenus",
+        q2: "As-tu déjà entrepris de ta propre initiative ?", q2_a: "Business avec revenus", q2_b: "Projet sans revenus", q2_c: "Ventes parallèles", q2_d: "Idées non concrétisées",
+        q3: "Comment réagis-tu face au risque financier ?", q3_a: "Je l'accepte si le potentiel est grand", q3_b: "Je prends des risques calculés", q3_c: "Je préfère la sécurité", q3_d: "Le risque m'angoisse",
+        q4: "Combien de temps peux-tu allouer à ton projet ?", q4_a: "Temps plein (40h+)", q4_b: "Mi-temps (20h+)", q4_c: "Soirs et week-ends", q4_d: "Moins de 5h par semaine",
+        q5: "Face à un problème complexe ou imprévu :", q5_a: "Je cherche des solutions créatives", q5_b: "Je demande conseil", q5_c: "Je suis souvent bloqué(e)", q5_d: "J'ai tendance à abandonner",
+        q6: "Comment gères-tu l'échec ?", q6_a: "J'analyse et je relance autre chose", q6_b: "Je prends du recul un moment", q6_c: "Je retourne au salariat", q6_d: "C'est la fin du monde",
+        q7: "Es-tu à l'aise pour vendre et te mettre en avant ?", q7_a: "J'adore convaincre", q7_b: "Je le fais si c'est nécessaire", q7_c: "Je préfère rester dans l'ombre", q7_d: "Je déteste la vente",
+        q8: "Quelle est ta capacité de discipline personnelle ?", q8_a: "Très discipliné(e) seul(e)", q8_b: "Organisé(e) avec des outils", q8_c: "J'ai besoin d'un cadre", q8_d: "Je procrastine beaucoup",
+        q9: "Comment vois-tu ton projet dans 3 ans ?", q9_a: "Une entreprise pérenne qui tourne", q9_b: "Un bon revenu de complément", q9_c: "Je verrai bien, pas de plan fixe", q9_d: "Je n'y ai pas pensé",
+        q10: "Quelle est ta motivation principale ?", q10_a: "Liberté et impact", q10_b: "Dépasser mes limites", q10_c: "Ne plus avoir de patron", q10_d: "Devenir riche rapidement"
+      },
+      nl: {
+        title: "Ben je gemaakt voor het ondernemerschap?", sub: "10 vragen. Een eerlijke score.",
+        prev: "Vorige", next: "Volgende", results: "Bekijk mijn resultaat",
+        q1: "Wat is je huidige werksituatie?", q1_a: "Werknemer op zoek naar autonomie", q1_b: "Beginnende zelfstandige", q1_c: "Carrièreswitch", q1_d: "Dringend inkomen nodig",
+        q2: "Heb je al eens zelfstandig iets ondernomen?", q2_a: "Zaken met inkomen", q2_b: "Project zonder inkomen", q2_c: "Parallelle verkoop", q2_d: "Ideeën niet gerealiseerd",
+        q3: "Hoe reageer je op financieel risico?", q3_a: "Ik accepteer het als het potentieel groot is", q3_b: "Ik neem berekende risico's", q3_c: "Ik geef de voorkeur aan veiligheid", q3_d: "Risico maakt me angstig",
+        q4: "Hoeveel tijd kun je aan je project besteden?", q4_a: "Fulltime (40u+)", q4_b: "Parttime (20u+)", q4_c: "Avonden en weekenden", q4_d: "Minder dan 5u per week",
+        q5: "Geconfronteerd met een onvoorzien probleem:", q5_a: "Ik zoek creatieve oplossingen", q5_b: "Ik vraag om advies", q5_c: "Ik ben vaak geblokkeerd", q5_d: "Ik neig ernaar op te geven",
+        q6: "Hoe ga je om met falen?", q6_a: "Ik analyseer en start iets anders", q6_b: "Ik neem even afstand", q6_c: "Ik ga terug in loondienst", q6_d: "Het is het einde van de wereld",
+        q7: "Ben je op je gemak met verkopen en jezelf profileren?", q7_a: "Ik hou ervan om te overtuigen", q7_b: "Ik doe het als het nodig is", q7_c: "Ik blijf liever op de achtergrond", q7_d: "Ik haat verkopen",
+        q8: "Wat is je persoonlijke discipline?", q8_a: "Zeer gedisciplineerd alleen", q8_b: "Georganiseerd met tools", q8_c: "Ik heb structuur nodig", q8_d: "Ik stel veel uit",
+        q9: "Hoe zie je jouw project over 3 jaar?", q9_a: "Een duurzaam draaiend bedrijf", q9_b: "Een goed extra inkomen", q9_c: "Ik zie wel, geen vast plan", q9_d: "Ik heb er niet over nagedacht",
+        q10: "Wat is je belangrijkste motivatie?", q10_a: "Vrijheid en impact", q10_b: "Mijn grenzen verleggen", q10_c: "Geen baas meer hebben", q10_d: "Snel rijk worden"
+      }
+    };
+
+    // Le barème total est de 100 points exacts (10 questions * max 10 points)
+    const questions = [
+      { id: 1, key: 'q1', opts: [{k:'q1_a', v:10}, {k:'q1_b', v:8}, {k:'q1_c', v:6}, {k:'q1_d', v:2}] },
+      { id: 2, key: 'q2', opts: [{k:'q2_a', v:10}, {k:'q2_b', v:8}, {k:'q2_c', v:6}, {k:'q2_d', v:3}] },
+      { id: 3, key: 'q3', opts: [{k:'q3_a', v:10}, {k:'q3_b', v:8}, {k:'q3_c', v:4}, {k:'q3_d', v:1}] },
+      { id: 4, key: 'q4', opts: [{k:'q4_a', v:10}, {k:'q4_b', v:7}, {k:'q4_c', v:5}, {k:'q4_d', v:1}] },
+      { id: 5, key: 'q5', opts: [{k:'q5_a', v:10}, {k:'q5_b', v:8}, {k:'q5_c', v:4}, {k:'q5_d', v:1}] },
+      { id: 6, key: 'q6', opts: [{k:'q6_a', v:10}, {k:'q6_b', v:7}, {k:'q6_c', v:3}, {k:'q6_d', v:1}] },
+      { id: 7, key: 'q7', opts: [{k:'q7_a', v:10}, {k:'q7_b', v:7}, {k:'q7_c', v:4}, {k:'q7_d', v:2}] },
+      { id: 8, key: 'q8', opts: [{k:'q8_a', v:10}, {k:'q8_b', v:8}, {k:'q8_c', v:5}, {k:'q8_d', v:1}] },
+      { id: 9, key: 'q9', opts: [{k:'q9_a', v:10}, {k:'q9_b', v:7}, {k:'q9_c', v:4}, {k:'q9_d', v:2}] },
+      { id: 10, key: 'q10', opts: [{k:'q10_a', v:10}, {k:'q10_b', v:8}, {k:'q10_c', v:5}, {k:'q10_d', v:1}] },
+    ];
+
+    let currentQ = 1;
+    const answers = {};
+    const totalQ = questions.length;
+    let currentLang = 'fr';
+
+    function renderQuiz() {
+      const container = document.getElementById('quizContainer');
+      document.getElementById('t-title').textContent = i18n[currentLang].title;
+      document.getElementById('t-subtitle').textContent = i18n[currentLang].sub;
+
+      container.innerHTML = questions.map(q => `
+        <div class="question ${q.id === currentQ ? 'active' : ''}" data-q="${q.id}">
+          <span class="q-text">${q.id}. ${i18n[currentLang][q.key]}</span>
+          <div class="options">
+            ${q.opts.map(opt => `
+              <label class="option ${answers[q.id]?.label === opt.k ? 'selected' : ''}" tabindex="0" onkeydown="if(event.key==='Enter') this.click()">
+                <input type="radio" name="q${q.id}" value="${opt.v}" data-label="${opt.k}" ${answers[q.id]?.label === opt.k ? 'checked' : ''}>
+                <span>${i18n[currentLang][opt.k]}</span>
+              </label>
+            `).join('')}
+          </div>
+        </div>
+      `).join('');
+      attachListeners();
+      updateButtons();
+    }
+
+    function attachListeners() {
+      document.querySelectorAll('.option input').forEach(inp => {
+        inp.addEventListener('change', (e) => {
+          const qId = parseInt(e.target.closest('.question').dataset.q);
+          answers[qId] = { val: parseInt(e.target.value), label: e.target.dataset.label };
+          e.target.closest('.options').querySelectorAll('.option').forEach(o => o.classList.remove('selected'));
+          e.target.closest('.option').classList.add('selected');
+          document.getElementById('nextBtn').disabled = false;
+        });
+      });
+    }
+
+    function updateButtons() {
+      const prevBtn = document.getElementById('prevBtn');
+      const nextBtn = document.getElementById('nextBtn');
+      prevBtn.disabled = currentQ === 1;
+      nextBtn.disabled = !answers[currentQ];
+
+      if (currentQ === totalQ) {
+        nextBtn.textContent = 'Soumettre ma candidature';
+        nextBtn.onclick = submitCandidature;
+      } else {
+        nextBtn.textContent = i18n[currentLang].next;
+        nextBtn.onclick = () => changeQ(1);
+      }
+    }
+
+    window.changeLang = (lang) => { currentLang = lang; renderQuiz(); };
+
+    window.startQuiz = () => {
+      // Honeypot : si rempli, c'est un bot -> on laisse filer sans bloquer
+      // ni révéler pourquoi (mais on ne l'enverra jamais à Firestore)
+      const prenom = document.getElementById('f-prenom').value.trim();
+      const nom = document.getElementById('f-nom').value.trim();
+      const email = document.getElementById('f-email').value.trim();
+      const tel = document.getElementById('f-tel').value.trim();
+      const ville = document.getElementById('f-ville').value.trim();
+
+      if (!prenom || !nom || !email || !tel || !ville) {
+        document.getElementById('infoError').style.display = 'block';
+        return;
+      }
+      document.getElementById('infoError').style.display = 'none';
+      document.getElementById('infoStep').style.display = 'none';
+      document.getElementById('quizStep').style.display = 'block';
+      renderQuiz();
+    };
+
+    window.changeQ = (dir) => {
+      document.querySelector(`.question[data-q="${currentQ}"]`).classList.remove('active');
+      currentQ += dir;
+      document.querySelector(`.question[data-q="${currentQ}"]`).classList.add('active');
+      document.getElementById('progressFill').style.width = ((currentQ - 1) / totalQ) * 100 + '%';
+      updateButtons();
+    };
+
+    async function submitCandidature() {
+      if (!answers[currentQ]) return;
+
+      // Honeypot : si rempli, on affiche un faux succès sans rien envoyer
+      if (document.getElementById('honeypot').value !== '') {
+        document.getElementById('quizStep').style.display = 'none';
+        document.getElementById('resultBlock').style.display = 'block';
+        return;
+      }
+
+      const attempts = JSON.parse(localStorage.getItem('tempus_attempts') || '{"count":0, "date":0}');
+      if (Date.now() - attempts.date > 86400000) { attempts.count = 0; attempts.date = Date.now(); }
+      if (attempts.count >= 3) return alert('Trop de tentatives. Réessayez demain.');
+
+      const nextBtn = document.getElementById('nextBtn');
+      const prevBtn = document.getElementById('prevBtn');
+      const errBox = document.getElementById('formError');
+      errBox.style.display = 'none';
+      nextBtn.disabled = true;
+      prevBtn.disabled = true;
+      const originalLabel = nextBtn.textContent;
+      nextBtn.textContent = 'Envoi en cours...';
+
+      let total = 0;
+      Object.values(answers).forEach(a => total += a.val);
+      const pct = total; // barème pile sur 100 points
+
+      try {
+        if (!db) throw new Error("Base de données non initialisée.");
+
+        await addDoc(collection(db, "candidates"), {
+          prenom: document.getElementById('f-prenom').value,
+          nom: document.getElementById('f-nom').value,
+          email: document.getElementById('f-email').value,
+          tel: document.getElementById('f-tel').value,
+          ville: document.getElementById('f-ville').value,
+          message: document.getElementById('f-message').value,
+          scorePct: pct,
+          reponses: answers,
+          status: "À contacter",
+          notes: "",
+          date: serverTimestamp()
+        });
+
+        attempts.count++;
+        localStorage.setItem('tempus_attempts', JSON.stringify(attempts));
+
+        // Affichage du résultat seulement après confirmation de l'envoi
+        document.getElementById('quizStep').style.display = 'none';
+        const rScore = document.getElementById('resultScore');
+        const rLabel = document.getElementById('resultLabel');
+        const rDesc = document.getElementById('resultDesc');
+        rScore.textContent = pct + '/100';
+
+        if (pct >= 80) {
+          rScore.style.color = 'var(--success)'; rLabel.style.background = 'var(--success-bg)'; rLabel.style.color = 'var(--success)';
+          rLabel.textContent = 'Profil Idéal';
+          confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 } });
+        } else if (pct >= 60) {
+          rScore.style.color = 'var(--info)'; rLabel.style.background = 'var(--info-bg)'; rLabel.style.color = 'var(--info)';
+          rLabel.textContent = 'Profil Prometteur';
+        } else {
+          rScore.style.color = 'var(--warning)'; rLabel.style.background = 'var(--warning-bg)'; rLabel.style.color = 'var(--warning)';
+          rLabel.textContent = 'À développer';
+        }
+        document.getElementById('resultBlock').style.display = 'block';
+      } catch (err) {
+        // Une erreur ici ne doit jamais afficher un faux succès : le
+        // candidat reste sur le quiz et peut réessayer.
+        console.error(err);
+        errBox.style.display = 'block';
+        nextBtn.disabled = false;
+        prevBtn.disabled = currentQ === 1;
+        nextBtn.textContent = originalLabel;
+      }
+    }
+
+    renderQuiz();
+  </script>
+</body>
+</html>
