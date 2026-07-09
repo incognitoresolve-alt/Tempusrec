@@ -130,7 +130,7 @@ textarea { width: 100%; height: 100px; padding: 12px; border: 1px solid var(--bo
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
 import {
-getFirestore, collection, getDocs, doc, updateDoc, orderBy, query
+getFirestore, initializeFirestore, collection, getDocs, doc, updateDoc, orderBy, query
 } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 import {
 getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut
@@ -149,7 +149,10 @@ const firebaseConfig = {
 let db, auth;
 try {
 const app = initializeApp(firebaseConfig);
-db = getFirestore(app);
+db = initializeFirestore(app, {
+  experimentalAutoDetectLongPolling: true,
+  useFetchStreams: false
+});
 auth = getAuth(app);
 } catch (e) { console.warn("Firebase non configuré.", e); }
 
