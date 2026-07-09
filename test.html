@@ -108,7 +108,7 @@
     // dans la même collection Firestore que lit dashboard.html
     // ========================================================================
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-    import { getFirestore, collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+    import { initializeFirestore, collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyCHd-33lduxacmQqf_KVBM75DiTHypTZtE",
@@ -122,7 +122,14 @@
     let db;
     try {
       const app = initializeApp(firebaseConfig);
-      db = getFirestore(app);
+      // experimentalAutoDetectLongPolling : si le streaming WebChannel classique
+      // est bloqué (pare-feu, antivirus, proxy d'entreprise), le SDK bascule
+      // automatiquement sur du long-polling HTTP standard, beaucoup plus
+      // susceptible de passer ces blocages.
+      db = initializeFirestore(app, {
+        experimentalAutoDetectLongPolling: true,
+        useFetchStreams: false
+      });
     } catch(e) {
       console.warn("Firebase non configuré.", e);
     }
@@ -296,7 +303,16 @@
       try {
         if (!db) throw new Error("Base de données non initialisée.");
 
-        await addDoc(collection(db, "candidates"), {
+        // Timeout de sécurité : Firestore ne rejette pas la promesse en cas
+        // de coupure réseau, il réessaie en interne indéfiniment. Sans ce
+        // timeout, le bouton resterait bloqué sur "Envoi en cours..." sans
+        // jamais montrer d'erreur au candidat.
+        const withTimeout = (promise, ms) => Promise.race([
+          promise,
+          new Promise((_, reject) => setTimeout(() => reject(new Error('Délai dépassé — vérifie ta connexion.')), ms))
+        ]);
+
+        await withTimeout(addDoc(collection(db, "candidates"), {
           prenom: document.getElementById('f-prenom').value,
           nom: document.getElementById('f-nom').value,
           email: document.getElementById('f-email').value,
@@ -308,7 +324,7 @@
           status: "À contacter",
           notes: "",
           date: serverTimestamp()
-        });
+        }), 15000);
 
         attempts.count++;
         localStorage.setItem('tempus_attempts', JSON.stringify(attempts));
@@ -336,6 +352,9 @@
         // Une erreur ici ne doit jamais afficher un faux succès : le
         // candidat reste sur le quiz et peut réessayer.
         console.error(err);
+        errBox.textContent = err.message && err.message.includes('Délai dépassé')
+          ? "Délai dépassé — vérifie ta connexion et réessaie."
+          : "Une erreur est survenue lors de l'envoi. Réessaie.";
         errBox.style.display = 'block';
         nextBtn.disabled = false;
         prevBtn.disabled = currentQ === 1;
